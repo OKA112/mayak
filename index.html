@@ -149,8 +149,8 @@
   table.tbl tr:last-child td{border-bottom:none}
   table.tbl thead th{padding:11px 4px 9px;font-size:11px;color:var(--faint);font-weight:500;position:sticky;top:0;background:var(--surface)}
   table.tbl thead th.now{color:var(--accent-ink);font-weight:700}
-  th.rh,td.rh{text-align:left;padding:10px 14px;position:sticky;left:0;background:var(--surface);z-index:2;
-    font-weight:500;font-size:13.5px;white-space:nowrap;border-right:1px solid var(--line)}
+  th.rh,td.rh{text-align:left;padding:11px 16px;position:sticky;left:0;background:var(--surface);z-index:2;
+    font-weight:500;font-size:13.5px;white-space:nowrap;border-right:1px solid var(--line);min-width:158px}
   td.rh .e{margin-right:8px}
   .cell{width:32px;height:36px;margin:2px auto;display:grid;place-items:center;cursor:pointer;font-size:14px;
     border-radius:8px;transition:transform .1s,background .12s,color .12s;color:var(--line-2)}
@@ -158,6 +158,8 @@
   .cell:active{transform:scale(.82)}
   .cell.done{color:#fff;background:var(--accent)}
   .cell.fail{color:#fff;background:var(--bad)}
+  .cell.pulse{animation:cellpop .28s ease}
+  @keyframes cellpop{0%{transform:scale(.7)}55%{transform:scale(1.18)}100%{transform:scale(1)}}
   .col-we{background:#faf9f5}
 
   .rows{display:flex;flex-direction:column;gap:8px;margin-top:14px}
@@ -195,12 +197,16 @@
   .feature .top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
   .feature h3{font-family:'Lora',serif;font-size:20px;font-weight:600}
   .feature .badge{font-size:12px;color:var(--ink-soft);background:var(--surface-2);border-radius:20px;padding:4px 11px;white-space:nowrap}
-  .moves{list-style:none;margin:16px 0 0;display:flex;flex-direction:column;gap:2px}
-  .moves li{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:14px}
-  .moves li:last-child{border-bottom:none}
-  .moves li .n{width:22px;flex:none;color:var(--faint);font-size:13px;font-variant-numeric:tabular-nums}
-  .moves li .mn{flex:1;font-weight:500}
-  .moves li .md{color:var(--ink-soft);font-size:13px;text-align:right;white-space:nowrap}
+  .moves{list-style:none;margin:16px 0 0;display:flex;flex-direction:column}
+  .moves .mv{padding:14px 0;border-bottom:1px solid var(--line)}
+  .moves .mv:last-child{border-bottom:none}
+  .mv-h{display:flex;gap:12px;align-items:baseline}
+  .mv-h .n{width:22px;flex:none;color:var(--faint);font-size:13px;font-variant-numeric:tabular-nums}
+  .mv-h .mn{flex:1;font-weight:500;font-size:14px}
+  .mv-h .md{color:var(--ink-soft);font-size:13px;text-align:right;white-space:nowrap}
+  .mv-img{display:flex;gap:8px;margin:10px 0 0 34px}
+  .mv-img img{width:calc(50% - 4px);max-width:170px;height:130px;object-fit:contain;background:#efeeea;border:1px solid var(--line);border-radius:10px}
+  @media(max-width:480px){.mv-img{margin-left:0}.mv-img img{height:112px}}
   .picker{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
   .chip{font-family:inherit;font-size:13px;padding:7px 13px;border:1px solid var(--line-2);border-radius:20px;background:var(--surface);
     cursor:pointer;color:var(--ink-soft);transition:.15s}
@@ -516,22 +522,46 @@ function ratio30(id){let t=0;for(let i=0;i<30;i++)if(getLog(key(addDays(today(),
 function habitByName(sub){return S.habits.find(h=>h.name.toLowerCase().includes(sub));}
 
 /* ---------------- content: workouts ---------------- */
+const EXIMG=f=>'https://cdn.jsdelivr.net/gh/yuhonas/free-exercise-db@main/exercises/'+f;
+// moves: [название, дозировка, папка-с-фото?]  — фото из free-exercise-db (public domain, единый стиль)
 const WORKOUTS=[
   {id:'w1',title:'Мягкое пробуждение',min:5,tag:'разминка суставов',moves:[
-    ['Наклоны и повороты головы','1 мин'],['Круговые движения плечами','30 сек'],['Вращение кистей и локтей','30 сек'],
-    ['Наклоны корпуса в стороны','1 мин'],['Вращение таза','1 мин'],['Подъёмы на носки','1 мин']]},
+    ['Разминка шеи','1 мин','Isometric_Neck_Exercise_-_Sides'],
+    ['Круговые движения руками','30 сек','Arm_Circles'],
+    ['Вращение бёдер','1 мин','Standing_Hip_Circles'],
+    ['Наклоны корпуса в стороны','1 мин'],
+    ['Наклон к носкам','1 мин','Standing_Toe_Touches'],
+    ['Подъёмы на носки','1 мин']]},
   {id:'w2',title:'Базовая зарядка',min:10,tag:'всё тело',moves:[
-    ['Марш на месте','1 мин'],['Приседания','15 раз'],['Наклоны к полу','10 раз'],['Отжимания (от стены/пола)','10 раз'],
-    ['Планка','30 сек'],['«Кошка-корова» для спины','1 мин'],['Выпады','по 10 на ногу'],['Растяжка','2 мин']]},
+    ['Приседания','15 раз','Bodyweight_Squat'],
+    ['Отжимания (можно от стены)','10 раз','Pushups'],
+    ['Выпады','по 10 на ногу','Bodyweight_Walking_Lunge'],
+    ['Планка','30 сек','Plank'],
+    ['«Кошка-корова» для спины','1 мин','Cat_Stretch'],
+    ['Наклон к носкам','10 раз','Standing_Toe_Touches'],
+    ['Растяжка задней поверхности бедра','1 мин','Hamstring_Stretch']]},
   {id:'w3',title:'Бодрость',min:12,tag:'лёгкое кардио',moves:[
-    ['Джампинг-джек','30 сек'],['Приседания','20 раз'],['Бег на месте, колени выше','1 мин'],['Отжимания','10 раз'],
-    ['«Скалолаз»','30 сек'],['Планка','40 сек'],['Ягодичный мост','15 раз'],['Растяжка','2 мин']]},
+    ['Присед с выпрыгиванием','15 раз','Freehand_Jump_Squat'],
+    ['Приседания','20 раз','Bodyweight_Squat'],
+    ['«Скалолаз»','30 сек','Mountain_Climbers'],
+    ['Отжимания','10 раз','Pushups'],
+    ['Планка','40 сек','Plank'],
+    ['Ягодичный мост','15 раз','Butt_Lift_Bridge'],
+    ['Растяжка бегуна','по 30 сек','Runners_Stretch']]},
   {id:'w4',title:'Спина и осанка',min:8,tag:'для сидячей работы',moves:[
-    ['«Кошка-корова»','1 мин'],['«Супермен» лёжа','12 раз'],['Сведение лопаток','15 раз'],['Наклон с прямой спиной','10 раз'],
-    ['Растяжка груди в дверном проёме','1 мин'],['Вытяжение у стены','1 мин']]},
+    ['«Кошка-корова»','1 мин','Cat_Stretch'],
+    ['«Супермен» лёжа','12 раз','Superman'],
+    ['Ягодичный мост','15 раз','Butt_Lift_Bridge'],
+    ['Скручивание позвоночника','по 1 мин','Spinal_Stretch'],
+    ['Наклон к носкам','1 мин','Standing_Toe_Touches'],
+    ['Растяжка задней поверхности бедра','1 мин','Hamstring_Stretch']]},
   {id:'w5',title:'Вечерняя растяжка',min:7,tag:'расслабление',moves:[
-    ['Наклон к ногам сидя','1 мин'],['Поза ребёнка','1 мин'],['Скрутка лёжа','по 1 мин'],
-    ['Растяжка бёдер','по 1 мин'],['Дыхание 4-7-8','1 мин']]},
+    ['Наклон к ногам сидя','1 мин','Seated_Floor_Hamstring_Stretch'],
+    ['Поза ребёнка','1 мин','Childs_Pose'],
+    ['Скрутка позвоночника','по 1 мин','Spinal_Stretch'],
+    ['Растяжка бедра','по 1 мин','Hamstring_Stretch'],
+    ['Растяжка бегуна','по 30 сек','Runners_Stretch'],
+    ['Дыхание 4-7-8','1 мин']]},
 ];
 let workoutSel=WORKOUTS[dayOfYear(new Date())%WORKOUTS.length].id;
 
@@ -646,7 +676,15 @@ function renderHabitTable(){
     h+='</tr>';});
   h+='</tbody>';
   const t=$('habitTable');t.innerHTML=h;
-  t.querySelectorAll('.cell').forEach(c=>c.onclick=()=>{cycleLog(c.dataset.k,c.dataset.id);renderHabitTable();renderToday();});
+  t.querySelectorAll('.cell').forEach(c=>c.onclick=()=>{
+    cycleLog(c.dataset.k,c.dataset.id);
+    const v=getLog(c.dataset.k,c.dataset.id);
+    c.classList.remove('done','fail','pulse');
+    c.textContent=v===true?'✓':v===false?'✕':'·';
+    if(v===true)c.classList.add('done');else if(v===false)c.classList.add('fail');
+    void c.offsetWidth;c.classList.add('pulse');
+    renderToday();
+  });
 }
 function renderHabitManage(){
   const w=$('habitManage');
@@ -665,7 +703,7 @@ function renderWorkout(){
   const zar=habitByName('заряд'),done=zar&&getLog(TODAY,zar.id)===true;
   $('workoutCard').innerHTML=`<div class="top"><div><h3>${w.title}</h3><div style="font-size:13px;color:var(--ink-soft);margin-top:3px">${w.tag}</div></div>
     <span class="badge">${w.min} мин</span></div>
-    <ol class="moves">${w.moves.map((m,i)=>`<li><span class="n">${i+1}</span><span class="mn">${m[0]}</span><span class="md">${m[1]}</span></li>`).join('')}</ol>
+    <ol class="moves">${w.moves.map((m,i)=>`<li class="mv"><div class="mv-h"><span class="n">${i+1}</span><span class="mn">${esc(m[0])}</span><span class="md">${m[1]}</span></div>${m[2]?`<div class="mv-img"><img loading="lazy" src="${EXIMG(m[2])}/0.jpg" alt="${esc(m[0])}" onerror="this.closest('.mv-img').style.display='none'"><img loading="lazy" src="${EXIMG(m[2])}/1.jpg" alt="" onerror="this.style.display='none'"></div>`:''}</li>`).join('')}</ol>
     <div style="margin-top:16px;display:flex;gap:9px"><button class="btn ${done?'ghost':''}" id="wDone" ${zar?'':'disabled'}>${done?'✓ Зарядка отмечена':'Отметить как сделано'}</button></div>
     ${zar?'':'<div class="hint">Добавь привычку со словом «зарядка», чтобы отмечать выполнение.</div>'}`;
   if(zar)$('wDone').onclick=()=>{markDone(TODAY,zar.id);renderWorkout();renderToday();renderHabitTable();};
