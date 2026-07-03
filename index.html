@@ -226,6 +226,17 @@
     background:var(--accent-soft);border-radius:6px;padding:2px 8px;margin-top:8px;text-decoration:none}
   .book .src:hover{background:#dce9e0}
   .book .min{font-size:11.5px;color:var(--faint);white-space:nowrap;margin-top:2px}
+  .book .rate{font-size:13px}
+  .brow{display:flex;align-items:center;gap:9px;margin-top:8px;flex-wrap:wrap}
+  .notebtn{font-family:inherit;font-size:11.5px;color:var(--ink-soft);background:none;border:1px solid var(--line-2);border-radius:6px;padding:2px 9px;cursor:pointer;transition:.15s}
+  .notebtn:hover{border-color:var(--faint);color:var(--ink)}
+  .notebtn.has{color:var(--accent-ink);border-color:#cfe1d5;background:var(--accent-soft)}
+  .npanel{margin-top:11px;padding-top:11px;border-top:1px solid var(--line)}
+  .rates{display:flex;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+  .rbtn{font-family:inherit;font-size:12.5px;padding:6px 11px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);cursor:pointer;color:var(--ink-soft);transition:.15s}
+  .rbtn:hover{border-color:var(--faint)}
+  .rbtn.on{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink)}
+  .ntext{font-size:13.5px}
 
   .empty{text-align:center;color:var(--faint);padding:30px 20px;font-size:14px}
 
@@ -451,10 +462,10 @@ const defaultState=()=>({
     {id:'h5',name:'Зарядка',emoji:'🤸',type:'build',save:0},
     {id:'h6',name:'Чтение',emoji:'📖',type:'build',save:0},
   ],
-  logs:{}, journal:{}, read:{}, _updatedAt:0
+  logs:{}, journal:{}, read:{}, books:{}, _updatedAt:0
 });
 let S=load();
-function load(){try{const r=localStorage.getItem(KEY);const s=r?JSON.parse(r):defaultState();s.journal=s.journal||{};s.read=s.read||{};if(!s._updatedAt)s._updatedAt=0;return s;}catch(e){return defaultState();}}
+function load(){try{const r=localStorage.getItem(KEY);const s=r?JSON.parse(r):defaultState();s.journal=s.journal||{};s.read=s.read||{};s.books=s.books||{};if(!s._updatedAt)s._updatedAt=0;return s;}catch(e){return defaultState();}}
 function persist(){localStorage.setItem(KEY,JSON.stringify(S));}
 let _pushT=null;
 function save(){S._updatedAt=Date.now();persist();schedulePush();}
@@ -464,13 +475,15 @@ function mergeStates(local,remote){
   if(!remote)return local;
   const lu=local._updatedAt||0,ru=remote._updatedAt||0;
   const primary=lu>=ru?local:remote, secondary=lu>=ru?remote:local;
-  const out={habits:primary.habits||[],logs:{},journal:{},read:{},_updatedAt:Math.max(lu,ru)};
+  const out={habits:primary.habits||[],logs:{},journal:{},read:{},books:{},_updatedAt:Math.max(lu,ru)};
   const ld=new Set([...Object.keys(local.logs||{}),...Object.keys(remote.logs||{})]);
   for(const d of ld){const m={...(secondary.logs?.[d]||{}),...(primary.logs?.[d]||{})};if(Object.keys(m).length)out.logs[d]=m;}
   const jd=new Set([...Object.keys(local.journal||{}),...Object.keys(remote.journal||{})]);
   for(const d of jd)out.journal[d]=primary.journal?.[d]||secondary.journal?.[d];
   const rd=new Set([...Object.keys(local.read||{}),...Object.keys(remote.read||{})]);
   for(const k of rd)if((local.read?.[k])||(remote.read?.[k]))out.read[k]=true;
+  const bd=new Set([...Object.keys(local.books||{}),...Object.keys(remote.books||{})]);
+  for(const k of bd){const v=primary.books?.[k]||secondary.books?.[k];if(v)out.books[k]=v;}
   return out;
 }
 window.__mayak={getState:()=>S,applyRemote:r=>{S=mergeStates(S,r);persist();renderAll();},onReady:()=>schedulePush()};
@@ -526,33 +539,52 @@ let workoutSel=WORKOUTS[dayOfYear(new Date())%WORKOUTS.length].id;
 const CATS=[['science','Научпоп'],['novel','Роман'],['detective','Детектив'],['econ','Экономика'],['marketing','Маркетинг'],['mgmt','Менеджмент']];
 const READING=[
   // научпоп
-  {id:'r1',cat:'science',t:'Элементы',a:'Новости и статьи о науке',min:'5–15 мин',url:'https://elementy.ru/',src:'elementy.ru',note:'Понятные разборы физики, биологии, космоса.'},
+  {id:'r1',cat:'science',t:'Элементы',a:'Новости и статьи о науке',min:'5–15 мин',url:'https://elementy.ru/',src:'elementy.ru',note:'Разборы физики, биологии, космоса.'},
   {id:'r2',cat:'science',t:'N + 1',a:'Научная журналистика',min:'5–10 мин',url:'https://nplus1.ru/',src:'nplus1.ru',note:'Свежие открытия простым языком.'},
   {id:'r3',cat:'science',t:'ПостНаука',a:'Учёные о своём деле',min:'10–20 мин',url:'https://postnauka.ru/',src:'postnauka.ru',note:'Статьи и лекции по всем областям знания.'},
   {id:'r4',cat:'science',t:'Arzamas',a:'Гуманитарные курсы',min:'15–30 мин',url:'https://arzamas.academy/',src:'arzamas.academy',note:'История, литература, искусство — бесплатно.'},
-  {id:'r5',cat:'science',t:'О происхождении видов',a:'Чарльз Дарвин',min:'книга',url:'https://ru.wikisource.org/wiki/О_происхождении_видов_(Дарвин;_Рачинский)/1864_(ВТ)',src:'Викитека',note:'Классика науки, полный текст.'},
+  {id:'r5',cat:'science',t:'Naked Science',a:'Наука и технологии',min:'5–10 мин',url:'https://naked-science.ru/',src:'naked-science.ru',note:'Новости науки и космоса.'},
+  {id:'r6',cat:'science',t:'Aeon',a:'Эссе о науке и жизни (англ.)',min:'эссе',url:'https://aeon.co/',src:'aeon.co',note:'Глубокие эссе о философии и науке.'},
+  {id:'r7',cat:'science',t:'Nautilus',a:'Наука в историях (англ.)',min:'лонгрид',url:'https://nautil.us/',src:'nautil.us',note:'Наука через большие сюжеты.'},
+  {id:'r8',cat:'science',t:'О происхождении видов',a:'Чарльз Дарвин',min:'книга',url:'https://ru.wikisource.org/wiki/О_происхождении_видов_(Дарвин;_Рачинский)/1864_(ВТ)',src:'Викитека',note:'Классика науки, полный текст.'},
   // роман
-  {id:'r6',cat:'novel',t:'Анна Каренина',a:'Лев Толстой',min:'роман',url:'http://ilibrary.ru/text/1099/index.html',src:'ilibrary.ru',note:'Полный текст, читается онлайн.'},
-  {id:'r7',cat:'novel',t:'Преступление и наказание',a:'Фёдор Достоевский',min:'роман',url:'http://ilibrary.ru/text/69/index.html',src:'ilibrary.ru',note:'Психологический роман-детектив.'},
-  {id:'r8',cat:'novel',t:'Отцы и дети',a:'Иван Тургенев',min:'роман',url:'http://ilibrary.ru/text/96/index.html',src:'ilibrary.ru',note:'Короткий и на все времена.'},
-  {id:'r9',cat:'novel',t:'Мёртвые души',a:'Николай Гоголь',min:'роман',url:'http://ilibrary.ru/text/78/index.html',src:'ilibrary.ru',note:'Сатира и русская хандра.'},
+  {id:'r9',cat:'novel',t:'Анна Каренина',a:'Лев Толстой',min:'роман',url:'https://ilibrary.ru/text/1099/index.html',src:'ilibrary.ru',note:'Полный текст, читается онлайн.'},
+  {id:'r10',cat:'novel',t:'Война и мир',a:'Лев Толстой',min:'роман',url:'https://ilibrary.ru/text/11/index.html',src:'ilibrary.ru',note:'Эпопея в четырёх томах.'},
+  {id:'r11',cat:'novel',t:'Преступление и наказание',a:'Фёдор Достоевский',min:'роман',url:'https://ilibrary.ru/text/69/index.html',src:'ilibrary.ru',note:'Психологический роман-детектив.'},
+  {id:'r12',cat:'novel',t:'Братья Карамазовы',a:'Фёдор Достоевский',min:'роман',url:'https://ilibrary.ru/text/1199/index.html',src:'ilibrary.ru',note:'Главный роман о вере и вине.'},
+  {id:'r13',cat:'novel',t:'Идиот',a:'Фёдор Достоевский',min:'роман',url:'https://ilibrary.ru/text/94/index.html',src:'ilibrary.ru',note:'История «положительно прекрасного» человека.'},
+  {id:'r14',cat:'novel',t:'Отцы и дети',a:'Иван Тургенев',min:'роман',url:'https://ilibrary.ru/text/96/index.html',src:'ilibrary.ru',note:'Короткий и на все времена.'},
+  {id:'r15',cat:'novel',t:'Мёртвые души',a:'Николай Гоголь',min:'роман',url:'https://ilibrary.ru/text/78/index.html',src:'ilibrary.ru',note:'Сатира и русская хандра.'},
+  {id:'r16',cat:'novel',t:'Евгений Онегин',a:'Александр Пушкин',min:'роман в стихах',url:'https://ilibrary.ru/text/436/index.html',src:'ilibrary.ru',note:'Энциклопедия русской жизни.'},
+  {id:'r17',cat:'novel',t:'Герой нашего времени',a:'Михаил Лермонтов',min:'роман',url:'https://ilibrary.ru/text/12/index.html',src:'ilibrary.ru',note:'Первый психологический роман.'},
+  {id:'r18',cat:'novel',t:'Обломов',a:'Иван Гончаров',min:'роман',url:'https://ilibrary.ru/text/475/index.html',src:'ilibrary.ru',note:'О лени, мечте и жизни на диване.'},
+  {id:'r19',cat:'novel',t:'Толстый и тонкий',a:'Антон Чехов',min:'рассказ',url:'https://ilibrary.ru/text/464/index.html',src:'ilibrary.ru',note:'Классика на пять минут.'},
   // детектив
-  {id:'r10',cat:'detective',t:'Пёстрая лента',a:'Артур Конан Дойл',min:'рассказ',url:'https://ru.wikisource.org/wiki/Пёстрая_лента_(Дойль;_1896)',src:'Викитека',note:'Классический рассказ о Шерлоке Холмсе.'},
-  {id:'r11',cat:'detective',t:'В пустом доме',a:'Артур Конан Дойл',min:'рассказ',url:'https://ru.wikisource.org/wiki/В_пустом_доме_(Дойль;_1903)',src:'Викитека',note:'Возвращение Холмса.'},
-  {id:'r12',cat:'detective',t:'Все рассказы о Шерлоке Холмсе',a:'Артур Конан Дойл',min:'сборник',url:'https://ru.wikisource.org/wiki/Артур_Конан_Дойль',src:'Викитека',note:'Полное собрание в открытом доступе.'},
+  {id:'r20',cat:'detective',t:'Пёстрая лента',a:'Артур Конан Дойл',min:'рассказ',url:'https://ru.wikisource.org/wiki/Пёстрая_лента_(Дойль;_1896)',src:'Викитека',note:'Классический рассказ о Шерлоке Холмсе.'},
+  {id:'r21',cat:'detective',t:'В пустом доме',a:'Артур Конан Дойл',min:'рассказ',url:'https://ru.wikisource.org/wiki/В_пустом_доме_(Дойль;_1903)',src:'Викитека',note:'Возвращение Холмса.'},
+  {id:'r22',cat:'detective',t:'Все рассказы о Шерлоке Холмсе',a:'Артур Конан Дойл',min:'сборник',url:'https://ru.wikisource.org/wiki/Артур_Конан_Дойль',src:'Викитека',note:'Полное собрание в открытом доступе.'},
+  {id:'r23',cat:'detective',t:'Убийство на улице Морг',a:'Эдгар Аллан По',min:'рассказ',url:'https://ru.wikisource.org/wiki/Убийство_на_улице_Морг_(По;_Бальмонт)',src:'Викитека',note:'Первый детектив в истории.'},
+  {id:'r24',cat:'detective',t:'Золотой жук',a:'Эдгар Аллан По',min:'рассказ',url:'https://ru.wikisource.org/wiki/Золотой_жук_(По;_Энгельгардт)',src:'Викитека',note:'Шифр, клад и дедукция.'},
+  {id:'r25',cat:'detective',t:'Все рассказы По',a:'Эдгар Аллан По',min:'сборник',url:'https://ru.wikisource.org/wiki/Автор:Эдгар_Аллан_По',src:'Викитека',note:'Детективы и мистика.'},
   // экономика
-  {id:'r13',cat:'econ',t:'Principles of Economics',a:'OpenStax (англ.)',min:'учебник',url:'https://openstax.org/details/books/principles-economics-3e',src:'openstax.org',note:'Бесплатный вузовский учебник, web/PDF.'},
-  {id:'r14',cat:'econ',t:'Экономика — на ПостНауке',a:'Лекции и статьи',min:'10–20 мин',url:'https://postnauka.ru/themes/ekonomika',src:'postnauka.ru',note:'Как устроены рынки и деньги.'},
+  {id:'r26',cat:'econ',t:'Principles of Economics',a:'OpenStax (англ.)',min:'учебник',url:'https://openstax.org/details/books/principles-economics-3e',src:'openstax.org',note:'Бесплатный вузовский учебник, web/PDF.'},
+  {id:'r27',cat:'econ',t:'Экономика — на ПостНауке',a:'Лекции и статьи',min:'10–20 мин',url:'https://postnauka.ru/themes/ekonomika',src:'postnauka.ru',note:'Как устроены рынки и деньги.'},
+  {id:'r28',cat:'econ',t:'Богатство народов',a:'Адам Смит (англ.)',min:'книга',url:'https://www.gutenberg.org/ebooks/3300',src:'Gutenberg',note:'Фундамент экономической мысли.'},
+  {id:'r29',cat:'econ',t:'Paul Graham — Essays',a:'Пол Грэм (англ.)',min:'эссе',url:'https://www.paulgraham.com/articles.html',src:'paulgraham.com',note:'Стартапы, деньги, мышление.'},
+  {id:'r30',cat:'econ',t:'vc.ru',a:'Бизнес и стартапы',min:'новости',url:'https://vc.ru/',src:'vc.ru',note:'Деньги и предпринимательство по-русски.'},
   // маркетинг
-  {id:'r15',cat:'marketing',t:'Principles of Marketing',a:'OpenStax (англ.)',min:'учебник',url:'https://openstax.org/details/books/principles-marketing',src:'openstax.org',note:'Основы маркетинга бесплатно.'},
-  {id:'r16',cat:'marketing',t:"Seth Godin's Blog",a:'Сет Годин (англ.)',min:'3–5 мин',url:'https://seths.blog/',src:'seths.blog',note:'Короткие заметки о маркетинге и идеях.'},
-  {id:'r17',cat:'marketing',t:'HubSpot Marketing Blog',a:'HubSpot (англ.)',min:'5–10 мин',url:'https://blog.hubspot.com/marketing',src:'blog.hubspot.com',note:'Практика цифрового маркетинга.'},
+  {id:'r31',cat:'marketing',t:'Principles of Marketing',a:'OpenStax (англ.)',min:'учебник',url:'https://openstax.org/details/books/principles-marketing',src:'openstax.org',note:'Основы маркетинга бесплатно.'},
+  {id:'r32',cat:'marketing',t:"Seth Godin's Blog",a:'Сет Годин (англ.)',min:'3–5 мин',url:'https://seths.blog/',src:'seths.blog',note:'Короткие заметки о маркетинге и идеях.'},
+  {id:'r33',cat:'marketing',t:'HubSpot Marketing Blog',a:'HubSpot (англ.)',min:'5–10 мин',url:'https://blog.hubspot.com/marketing',src:'blog.hubspot.com',note:'Практика цифрового маркетинга.'},
+  {id:'r34',cat:'marketing',t:'First Round Review',a:'First Round (англ.)',min:'статьи',url:'https://review.firstround.com/',src:'firstround.com',note:'Рост и продукт от основателей.'},
   // менеджмент
-  {id:'r18',cat:'mgmt',t:'Principles of Management',a:'OpenStax (англ.)',min:'учебник',url:'https://openstax.org/details/books/principles-management',src:'openstax.org',note:'Планирование, организация, лидерство.'},
-  {id:'r19',cat:'mgmt',t:'Organizational Behavior',a:'OpenStax (англ.)',min:'учебник',url:'https://openstax.org/details/books/organizational-behavior',src:'openstax.org',note:'Как работают люди в командах.'},
-  {id:'r20',cat:'mgmt',t:'MIT OpenCourseWare',a:'Sloan / Management',min:'курсы',url:'https://ocw.mit.edu/',src:'ocw.mit.edu',note:'Бесплатные материалы курсов MIT.'},
+  {id:'r35',cat:'mgmt',t:'Principles of Management',a:'OpenStax (англ.)',min:'учебник',url:'https://openstax.org/details/books/principles-management',src:'openstax.org',note:'Планирование, организация, лидерство.'},
+  {id:'r36',cat:'mgmt',t:'Organizational Behavior',a:'OpenStax (англ.)',min:'учебник',url:'https://openstax.org/details/books/organizational-behavior',src:'openstax.org',note:'Как работают люди в командах.'},
+  {id:'r37',cat:'mgmt',t:'MIT OpenCourseWare',a:'Sloan / Management',min:'курсы',url:'https://ocw.mit.edu/',src:'ocw.mit.edu',note:'Бесплатные материалы курсов MIT.'},
+  {id:'r38',cat:'mgmt',t:'Farnam Street',a:'Shane Parrish (англ.)',min:'блог',url:'https://fs.blog/',src:'fs.blog',note:'Ментальные модели и решения.'},
 ];
 let readCat='all';
+const openNotes=new Set();
 
 /* ---------------- render: TODAY ---------------- */
 function renderToday(){
@@ -655,17 +687,30 @@ function renderReading(){
 
   const items=READING.filter(r=>readCat==='all'||r.cat===readCat);
   const catName=Object.fromEntries(CATS);
-  $('readList').innerHTML=items.map(r=>{const rd=!!S.read[r.id];
-    return `<div class="book ${rd?'read':''}"><div class="chk" data-id="${r.id}">${rd?'✓':''}</div>
-      <div class="body"><div class="ti"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.t)}</a></div>
+  $('readList').innerHTML=items.map(r=>{
+    const rd=!!S.read[r.id], bk=S.books[r.id]||{}, has=!!(bk.note&&bk.note.trim())||!!bk.rating, open=openNotes.has(r.id);
+    const badge=bk.rating==='up'?' <span class="rate">👍</span>':bk.rating==='down'?' <span class="rate">👎</span>':'';
+    return `<div class="book ${rd?'read':''}"><div class="chk" data-id="${r.id}" title="Отметить прочитанным">${rd?'✓':''}</div>
+      <div class="body"><div class="ti"><a href="${r.url}" target="_blank" rel="noopener">${esc(r.t)}</a>${badge}</div>
       <div class="au">${esc(r.a)}${readCat==='all'?' · '+catName[r.cat]:''}</div>
       <div class="note">${esc(r.note)}</div>
-      <a class="src" href="${r.url}" target="_blank" rel="noopener">↗ ${r.src}</a></div>
-      <div class="min">${r.min}</div></div>`;}).join('');
+      <div class="brow"><a class="src" href="${r.url}" target="_blank" rel="noopener">↗ ${r.src}</a>
+        <button class="notebtn ${has?'has':''}" data-t="${r.id}">${has?'✎ заметка':'＋ заметка'}</button></div>
+      ${open?`<div class="npanel">
+        <div class="rates"><button class="rbtn ${bk.rating==='up'?'on':''}" data-up="${r.id}">👍 понравилось</button><button class="rbtn ${bk.rating==='down'?'on':''}" data-down="${r.id}">👎 не зашло</button></div>
+        <textarea class="ntext" data-n="${r.id}" rows="3" placeholder="Мысли, где остановился, понравилось…">${esc(bk.note||'')}</textarea></div>`:''}
+      </div><div class="min">${r.min}</div></div>`;}).join('');
   $('readList').querySelectorAll('.chk').forEach(c=>c.onclick=()=>{
     const id=c.dataset.id;if(S.read[id])delete S.read[id];else{S.read[id]=true;const cht=habitByName('чтен');if(cht)markDone(TODAY,cht.id);}
     save();renderReading();renderToday();renderHabitTable();});
+  $('readList').querySelectorAll('.notebtn').forEach(b=>b.onclick=()=>{const id=b.dataset.t;openNotes.has(id)?openNotes.delete(id):openNotes.add(id);renderReading();});
+  $('readList').querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>setBookRating(b.dataset.up,'up'));
+  $('readList').querySelectorAll('[data-down]').forEach(b=>b.onclick=()=>setBookRating(b.dataset.down,'down'));
+  $('readList').querySelectorAll('.ntext').forEach(t=>t.oninput=()=>setBookNote(t.dataset.n,t.value));
 }
+function setBookRating(id,r){const b=S.books[id]||{};b.rating=(b.rating===r)?null:r;S.books[id]=b;cleanBook(id);save();renderReading();}
+function setBookNote(id,txt){const b=S.books[id]||{};b.note=txt;S.books[id]=b;cleanBook(id);save();}
+function cleanBook(id){const b=S.books[id];if(b&&!(b.note&&b.note.trim())&&!b.rating)delete S.books[id];}
 
 /* ---------------- render: STATS ---------------- */
 function renderStats(){

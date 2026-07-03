@@ -1,0 +1,40 @@
+name: Маяк — напоминания в Telegram
+
+# 3 напоминания в день. Время указано в UTC.
+# По умолчанию — часовой пояс Москвы (MSK = UTC+3):
+#   07:00 UTC = 10:00 MSK   |   12:00 UTC = 15:00 MSK   |   17:00 UTC = 20:00 MSK
+# Другой пояс? Сдвинь три времени ниже и строку TZ в шаге "Отправить".
+on:
+  schedule:
+    - cron: '0 7 * * *'
+    - cron: '0 12 * * *'
+    - cron: '0 17 * * *'
+  workflow_dispatch:   # позволяет запустить вручную для проверки
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Отправить напоминание
+        env:
+          TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Адрес приложения (поменяй, если репозиторий назван иначе или хостинг другой)
+          APP_URL: 'https://oka112.github.io/mayak/'
+        run: |
+          if [ -z "$TOKEN" ] || [ -z "$CHAT" ]; then
+            echo "Не заданы секреты TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID"; exit 1
+          fi
+          H=$(TZ='Europe/Moscow' date +%H)
+          if [ "$H" -lt 12 ]; then
+            MSG=$'☀️ Доброе утро!\nЗагляни в «Маяк»: отметь зарядку, воду и настройся на день без вредного.'
+          elif [ "$H" -lt 18 ]; then
+            MSG=$'🕒 Середина дня.\nКак идёшь? Отметь привычки в «Маяке» и удержись от соблазна.'
+          else
+            MSG=$'🌙 Вечер.\nПодведи итог в «Маяке»: чек-лист, чтение и пара строк в дневник.'
+          fi
+          MSG="${MSG}"$'\n'"${APP_URL}"
+          curl -sS -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
+            -d chat_id="${CHAT}" \
+            --data-urlencode text="${MSG}" \
+            -d disable_web_page_preview=true
