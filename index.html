@@ -887,26 +887,42 @@ function foot(msg,ok){const f=$('syncFootStatus');if(f){f.textContent=msg;f.styl
 window.MayakSync={ready:false,async push(state){if(!client||!uid)return;const p=JSON.parse(JSON.stringify(state));const sig=canon(p);if(sig===lastSent)return;lastSent=sig;
   const {error}=await client.from('mayak_state').upsert({user_id:uid,data:p,updated_at:new Date().toISOString()});
   if(error){status('Ошибка отправки: '+error.message,'bad');lastSent=null;}else foot('☁ синхронизировано '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),true);}};
-function refreshUI(session){const cfg=getCfg();if(cfg){$('syUrl').value=cfg.url;$('syKey').value=cfg.key;}$('syAuthField').style.display=(cfg&&!session)?'block':'none';$('sySignout').style.display=session?'inline-flex':'none';$('sySyncNow').style.display=session?'block':'none';}
+function refreshUI(session){const cfg=getCfg();if(cfg){$('syUrl').value=cfg.url;$('syKey').value=cfg.key;}$('syAuthField').style.display=(cfg&&!session)?'block':'none';$('sySignout').style.display=session?'inline-flex':'none';$('sySyncNow').style.display=cfg?'block':'none';}
+// Manual sync via RAW fetch — bypasses supabase-js (its auth can hang behind extensions/CSP)
+function sessionFromStorage(cfg){
+  try{
+    const ref=cfg.url.replace(/^https?:\/\//,'').split('.')[0];
+    const raw=JSON.parse(localStorage.getItem('sb-'+ref+'-auth-token'));
+    const s=raw&&(raw.access_token?raw:raw.currentSession)||raw;
+    if(s&&s.access_token&&s.user&&s.user.id)return {tok:s.access_token,myid:s.user.id};
+  }catch(e){}
+  return null;
+}
 async function manualSync(){
-  if(!client||!uid){status('Сначала войди (email и пароль).','bad');return;}
+  const cfg=getCfg();
+  if(!cfg){status('Не настроено — введи ключи Supabase.','bad');return;}
   const b=$('sySyncNow');b.disabled=true;b.textContent='Синхронизирую…';
-  const T=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('таймаут сети — проверь интернет')),ms))]);
+  const done=(msg,kind)=>{status(msg,kind);b.disabled=false;b.textContent='🔄 Синхронизировать сейчас';};
+  const T=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('таймаут сети')),ms))]);
+  const sess=sessionFromStorage(cfg);
+  if(!sess)return done('Вход не найден — войди заново (email и пароль).','bad');
+  const H={apikey:cfg.key,Authorization:'Bearer '+sess.tok,'Content-Type':'application/json'};
   try{
     status('Читаю облако…');
-    const {data,error}=await T(client.from('mayak_state').select('data').eq('user_id',uid).maybeSingle(),12000);
-    if(error)throw error;
-    const R=data&&data.data;
+    const rr=await T(fetch(cfg.url+'/rest/v1/mayak_state?user_id=eq.'+sess.myid+'&select=data',{headers:H,cache:'no-store'}),12000);
+    if(rr.status===401)return done('Вход устарел — нажми «Выйти» и войди заново.','bad');
+    if(!rr.ok)throw new Error('чтение HTTP '+rr.status);
+    const rows=await rr.json();
+    const R=rows&&rows[0]&&rows[0].data;
     if(R&&(R.logs||R.habits))window.__mayak.applyRemote(R);
     status('Отправляю…');
     const payload=JSON.parse(JSON.stringify(window.__mayak.getState()));
-    const {error:e2}=await T(client.from('mayak_state').upsert({user_id:uid,data:payload,updated_at:new Date().toISOString()}),12000);
-    if(e2)throw e2;
+    const up=await T(fetch(cfg.url+'/rest/v1/mayak_state',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:sess.myid,data:payload,updated_at:new Date().toISOString()})}),12000);
+    if(!up.ok)throw new Error('запись HTTP '+up.status);
     lastSent=canon(payload);
-    status('Синхронизировано ✓ · отмеченных дней: '+Object.keys(payload.logs||{}).length,'ok');
     foot('☁ синхронизировано '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),true);
-  }catch(e){status('Ошибка: '+(e.message||e),'bad');}
-  b.disabled=false;b.textContent='🔄 Синхронизировать сейчас';
+    done('Синхронизировано ✓ · отмеченных дней: '+Object.keys(payload.logs||{}).length,'ok');
+  }catch(e){done('Ошибка: '+(e.message||e),'bad');}
 }
 async function doAuth(mode){
   if(!client){alert('Сначала сохрани ключи Supabase.');return;}
