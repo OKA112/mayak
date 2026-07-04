@@ -1,5 +1,5 @@
 /* Маяк service worker — офлайн-кэш (stale-while-revalidate) */
-const CACHE = 'mayak-v10';
+const CACHE = 'mayak-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -30,6 +30,9 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   // handle only http(s); ignore chrome-extension: and other schemes
   if (!req.url.startsWith('http')) return;
+  // NEVER touch Supabase (API/auth/realtime) — always live network, no caching
+  const host = new URL(req.url).hostname;
+  if (host.endsWith('supabase.co') || host.endsWith('supabase.in')) return;
   e.respondWith(
     caches.match(req).then(cached => {
       const network = fetch(req).then(res => {

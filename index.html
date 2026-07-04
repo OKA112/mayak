@@ -890,18 +890,22 @@ window.MayakSync={ready:false,async push(state){if(!client||!uid)return;const p=
 function refreshUI(session){const cfg=getCfg();if(cfg){$('syUrl').value=cfg.url;$('syKey').value=cfg.key;}$('syAuthField').style.display=(cfg&&!session)?'block':'none';$('sySignout').style.display=session?'inline-flex':'none';$('sySyncNow').style.display=session?'block':'none';}
 async function manualSync(){
   if(!client||!uid){status('Сначала войди (email и пароль).','bad');return;}
-  const b=$('sySyncNow');b.disabled=true;b.textContent='Синхронизирую…';status('Синхронизирую…');
+  const b=$('sySyncNow');b.disabled=true;b.textContent='Синхронизирую…';
+  const T=(p,ms)=>Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('таймаут сети — проверь интернет')),ms))]);
   try{
-    const {data,error}=await client.from('mayak_state').select('data').eq('user_id',uid).maybeSingle();
+    status('Читаю облако…');
+    const {data,error}=await T(client.from('mayak_state').select('data').eq('user_id',uid).maybeSingle(),12000);
     if(error)throw error;
     const R=data&&data.data;
     if(R&&(R.logs||R.habits))window.__mayak.applyRemote(R);
-    lastSent=null;
-    await window.MayakSync.push(window.__mayak.getState());
-    const n=Object.keys(window.__mayak.getState().logs||{}).length;
-    status('Синхронизировано ✓ · отмеченных дней: '+n,'ok');
+    status('Отправляю…');
+    const payload=JSON.parse(JSON.stringify(window.__mayak.getState()));
+    const {error:e2}=await T(client.from('mayak_state').upsert({user_id:uid,data:payload,updated_at:new Date().toISOString()}),12000);
+    if(e2)throw e2;
+    lastSent=canon(payload);
+    status('Синхронизировано ✓ · отмеченных дней: '+Object.keys(payload.logs||{}).length,'ok');
     foot('☁ синхронизировано '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),true);
-  }catch(e){status('Ошибка синхронизации: '+(e.message||e),'bad');}
+  }catch(e){status('Ошибка: '+(e.message||e),'bad');}
   b.disabled=false;b.textContent='🔄 Синхронизировать сейчас';
 }
 async function doAuth(mode){
