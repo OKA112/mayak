@@ -429,6 +429,7 @@
   <div class="modal" style="max-width:460px">
     <h3>☁ Синхронизация между устройствами</h3>
     <div id="syncStatus" style="font-size:13px;padding:9px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);margin-bottom:14px;color:var(--ink-soft)">Проверяю…</div>
+    <button class="btn" id="sySyncNow" type="button" style="display:none;width:100%;justify-content:center;margin-bottom:14px">🔄 Синхронизировать сейчас</button>
     <div id="syncConfig">
       <div class="field"><label>Project URL (Supabase → Settings → API)</label><input type="text" id="syUrl" placeholder="https://xxxx.supabase.co"></div>
       <div class="field"><label>anon / publishable key</label><input type="text" id="syKey" placeholder="sb_publishable_… или eyJhbGci…"></div>
@@ -886,7 +887,23 @@ function foot(msg,ok){const f=$('syncFootStatus');if(f){f.textContent=msg;f.styl
 window.MayakSync={ready:false,async push(state){if(!client||!uid)return;const p=JSON.parse(JSON.stringify(state));const sig=canon(p);if(sig===lastSent)return;lastSent=sig;
   const {error}=await client.from('mayak_state').upsert({user_id:uid,data:p,updated_at:new Date().toISOString()});
   if(error){status('Ошибка отправки: '+error.message,'bad');lastSent=null;}else foot('☁ синхронизировано '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),true);}};
-function refreshUI(session){const cfg=getCfg();if(cfg){$('syUrl').value=cfg.url;$('syKey').value=cfg.key;}$('syAuthField').style.display=(cfg&&!session)?'block':'none';$('sySignout').style.display=session?'inline-flex':'none';}
+function refreshUI(session){const cfg=getCfg();if(cfg){$('syUrl').value=cfg.url;$('syKey').value=cfg.key;}$('syAuthField').style.display=(cfg&&!session)?'block':'none';$('sySignout').style.display=session?'inline-flex':'none';$('sySyncNow').style.display=session?'block':'none';}
+async function manualSync(){
+  if(!client||!uid){status('Сначала войди (email и пароль).','bad');return;}
+  const b=$('sySyncNow');b.disabled=true;b.textContent='Синхронизирую…';status('Синхронизирую…');
+  try{
+    const {data,error}=await client.from('mayak_state').select('data').eq('user_id',uid).maybeSingle();
+    if(error)throw error;
+    const R=data&&data.data;
+    if(R&&(R.logs||R.habits))window.__mayak.applyRemote(R);
+    lastSent=null;
+    await window.MayakSync.push(window.__mayak.getState());
+    const n=Object.keys(window.__mayak.getState().logs||{}).length;
+    status('Синхронизировано ✓ · отмеченных дней: '+n,'ok');
+    foot('☁ синхронизировано '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),true);
+  }catch(e){status('Ошибка синхронизации: '+(e.message||e),'bad');}
+  b.disabled=false;b.textContent='🔄 Синхронизировать сейчас';
+}
 async function doAuth(mode){
   if(!client){alert('Сначала сохрани ключи Supabase.');return;}
   const email=$('syEmail').value.trim(), pass=$('syPass').value;
@@ -933,6 +950,7 @@ function wireUI(){
     if(key.length<20){alert('Похоже, anon key введён не полностью.');return;}setCfg({url,key});status('Ключи сохранены, подключаюсь…');location.reload();};
   $('syLogin').onclick=()=>doAuth('in');
   $('sySignup').onclick=()=>doAuth('up');
+  $('sySyncNow').onclick=manualSync;
   $('sySignout').onclick=async()=>{try{if(client)await client.auth.signOut({scope:'local'});}catch(e){}uid=null;window.MayakSync.ready=false;lastSent=null;foot('');status('Вышел. Можешь войти заново.');refreshUI(null);};
 }
 async function init(){wireUI();const cfg=getCfg();if(!cfg){status('Не настроено. Введи ключи Supabase, чтобы отметки синхронизировались между устройствами.');refreshUI(null);return;}
