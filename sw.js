@@ -1,5 +1,5 @@
 /* Маяк service worker — офлайн-кэш (stale-while-revalidate) */
-const CACHE = 'mayak-v8';
+const CACHE = 'mayak-v9';
 const ASSETS = [
   './',
   './index.html',
@@ -28,12 +28,14 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  // handle only http(s); ignore chrome-extension: and other schemes
+  if (!req.url.startsWith('http')) return;
   e.respondWith(
     caches.match(req).then(cached => {
       const network = fetch(req).then(res => {
         if (res && res.status === 200 && (res.type === 'basic' || res.type === 'cors')) {
           const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(req, clone));
+          caches.open(CACHE).then(c => c.put(req, clone)).catch(() => {});
         }
         return res;
       }).catch(() => cached);

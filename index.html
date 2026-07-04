@@ -910,7 +910,17 @@ async function doAuth(mode){
 }
 async function onSession(session){if(session){uid=session.user.id;window.MayakSync.ready=true;status('Вошёл как '+session.user.email+'. Синхронизация включена.','ok');foot('☁ подключено',true);refreshUI(session);await pull();subscribe();window.__mayak.onReady();}
   else{uid=null;window.MayakSync.ready=false;status('Ключи сохранены. Войди по email, чтобы включить синхронизацию.');refreshUI(null);}}
-async function pull(){const {data,error}=await client.from('mayak_state').select('data').eq('user_id',uid).maybeSingle();if(error){status('Ошибка чтения: '+error.message,'bad');return;}if(data&&data.data&&data.data.habits)window.__mayak.applyRemote(data.data);lastSent=null;window.MayakSync.push(window.__mayak.getState());}
+async function pull(){
+  const {data,error}=await client.from('mayak_state').select('data').eq('user_id',uid).maybeSingle();
+  if(error){status('Ошибка чтения: '+error.message,'bad');return;}
+  const remote=data&&data.data;
+  if(remote&&(remote.logs||remote.habits)){
+    window.__mayak.applyRemote(remote);
+    foot('☁ данные получены · дней: '+Object.keys(window.__mayak.getState().logs||{}).length,true);
+  }
+  lastSent=null;
+  window.MayakSync.push(window.__mayak.getState());
+}
 function subscribe(){if(channel)client.removeChannel(channel);channel=client.channel('mayak-'+uid).on('postgres_changes',{event:'*',schema:'public',table:'mayak_state',filter:'user_id=eq.'+uid},p=>{const d=p.new&&p.new.data;if(d&&d.habits){window.__mayak.applyRemote(d);window.MayakSync.push(window.__mayak.getState());}}).subscribe();}
 function wireUI(){
   $('syncBtn').onclick=e=>{e.preventDefault();$('syncModal').classList.add('on');};
