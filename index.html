@@ -923,7 +923,7 @@ function wireUI(){
     if(key.length<20){alert('Похоже, anon key введён не полностью.');return;}setCfg({url,key});status('Ключи сохранены, подключаюсь…');location.reload();};
   $('syLogin').onclick=()=>doAuth('in');
   $('sySignup').onclick=()=>doAuth('up');
-  $('sySignout').onclick=async()=>{if(client)await client.auth.signOut();foot('');status('Вышел. Синхронизация выключена.');};
+  $('sySignout').onclick=async()=>{try{if(client)await client.auth.signOut({scope:'local'});}catch(e){}uid=null;window.MayakSync.ready=false;lastSent=null;foot('');status('Вышел. Можешь войти заново.');refreshUI(null);};
 }
 async function init(){wireUI();const cfg=getCfg();if(!cfg){status('Не настроено. Введи ключи Supabase, чтобы отметки синхронизировались между устройствами.');refreshUI(null);return;}
   try{const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');client=createClient(cfg.url,cfg.key,{auth:{persistSession:true,detectSessionInUrl:true}});}
