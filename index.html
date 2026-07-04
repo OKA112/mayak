@@ -894,11 +894,18 @@ async function doAuth(mode){
   if(pass.length<6){alert('Пароль минимум 6 символов.');return;}
   if(mode==='up'){
     const {data,error}=await client.auth.signUp({email,password:pass});
-    if(error){alert('Ошибка регистрации: '+error.message);return;}
+    if(error){
+      if(/registered|exists/i.test(error.message))status('Аккаунт с этой почтой уже есть — нажми «Войти» тем же паролем.','bad');
+      else status('Ошибка регистрации: '+error.message,'bad');
+      return;
+    }
     if(!data.session)status('Аккаунт создан, но требуется подтверждение почты. Выключи «Confirm email» в Supabase и нажми «Войти».','bad');
   }else{
     const {error}=await client.auth.signInWithPassword({email,password:pass});
-    if(error)status('Не удалось войти: '+error.message+'. Если аккаунта ещё нет — нажми «Регистрация».','bad');
+    if(error){
+      if(/invalid login|credentials/i.test(error.message))status('Неверный email или пароль. Введи ровно те же, что на первом устройстве (проверь заглавные буквы).','bad');
+      else status('Не удалось войти: '+error.message,'bad');
+    }
   }
 }
 async function onSession(session){if(session){uid=session.user.id;window.MayakSync.ready=true;status('Вошёл как '+session.user.email+'. Синхронизация включена.','ok');foot('☁ подключено',true);refreshUI(session);await pull();subscribe();window.__mayak.onReady();}
