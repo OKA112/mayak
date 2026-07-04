@@ -431,20 +431,26 @@
     <div id="syncStatus" style="font-size:13px;padding:9px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);margin-bottom:14px;color:var(--ink-soft)">Проверяю…</div>
     <div id="syncConfig">
       <div class="field"><label>Project URL (Supabase → Settings → API)</label><input type="text" id="syUrl" placeholder="https://xxxx.supabase.co"></div>
-      <div class="field"><label>anon public key</label><input type="text" id="syKey" placeholder="eyJhbGci..."></div>
+      <div class="field"><label>anon / publishable key</label><input type="text" id="syKey" placeholder="sb_publishable_… или eyJhbGci…"></div>
       <button class="btn ghost sm" id="syHelp" type="button">Как получить эти данные?</button>
       <div id="syHelpBox" style="display:none;font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin-top:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
         <b>Разово, ~5 минут:</b><br>
         1. На <b>supabase.com</b> войди через GitHub → <b>New project</b>.<br>
         2. <b>SQL Editor</b> → вставь SQL (кнопка ниже) и запусти.<br>
-        3. <b>Authentication → URL Configuration</b>: в Site URL и Redirect URLs добавь адрес сайта.<br>
-        4. <b>Project Settings → API</b>: скопируй Project URL и ключ anon public сюда.
+        3. <b>Authentication → Sign In / Providers → Email</b>: выключи <b>Confirm email</b> (тогда вход без писем и лимитов).<br>
+        4. <b>Settings → API Keys</b>: скопируй Project URL и ключ <b>publishable</b> (не secret!) сюда.
         <div style="margin-top:10px"><button class="btn ghost sm" id="copySql" type="button">Скопировать SQL</button></div>
       </div>
     </div>
     <div class="field" id="syAuthField" style="margin-top:14px;display:none">
-      <label>Твой email (вход по ссылке из письма)</label>
-      <div style="display:flex;gap:8px"><input type="email" id="syEmail" placeholder="you@mail.com"><button class="btn sm" id="syLogin" type="button" style="white-space:nowrap">Войти</button></div>
+      <label>Вход по email и паролю</label>
+      <input type="email" id="syEmail" placeholder="you@mail.com" style="margin-bottom:8px">
+      <input type="password" id="syPass" placeholder="пароль (минимум 6 символов)">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn ghost sm" id="sySignup" type="button" style="flex:1">Регистрация</button>
+        <button class="btn sm" id="syLogin" type="button" style="flex:1">Войти</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--faint);margin-top:7px">Первый раз — «Регистрация». На других устройствах тем же email и паролем — «Войти».</div>
     </div>
     <div class="mact">
       <button class="btn ghost" id="sySignout" type="button" style="display:none">Выйти</button>
@@ -881,6 +887,20 @@ window.MayakSync={ready:false,async push(state){if(!client||!uid)return;const p=
   const {error}=await client.from('mayak_state').upsert({user_id:uid,data:p,updated_at:new Date().toISOString()});
   if(error){status('Ошибка отправки: '+error.message,'bad');lastSent=null;}else foot('☁ синхронизировано '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),true);}};
 function refreshUI(session){const cfg=getCfg();if(cfg){$('syUrl').value=cfg.url;$('syKey').value=cfg.key;}$('syAuthField').style.display=(cfg&&!session)?'block':'none';$('sySignout').style.display=session?'inline-flex':'none';}
+async function doAuth(mode){
+  if(!client){alert('Сначала сохрани ключи Supabase.');return;}
+  const email=$('syEmail').value.trim(), pass=$('syPass').value;
+  if(!/.+@.+\..+/.test(email)){alert('Введи корректный email.');return;}
+  if(pass.length<6){alert('Пароль минимум 6 символов.');return;}
+  if(mode==='up'){
+    const {data,error}=await client.auth.signUp({email,password:pass});
+    if(error){alert('Ошибка регистрации: '+error.message);return;}
+    if(!data.session)status('Аккаунт создан, но требуется подтверждение почты. Выключи «Confirm email» в Supabase и нажми «Войти».','bad');
+  }else{
+    const {error}=await client.auth.signInWithPassword({email,password:pass});
+    if(error)status('Не удалось войти: '+error.message+'. Если аккаунта ещё нет — нажми «Регистрация».','bad');
+  }
+}
 async function onSession(session){if(session){uid=session.user.id;window.MayakSync.ready=true;status('Вошёл как '+session.user.email+'. Синхронизация включена.','ok');foot('☁ подключено',true);refreshUI(session);await pull();subscribe();window.__mayak.onReady();}
   else{uid=null;window.MayakSync.ready=false;status('Ключи сохранены. Войди по email, чтобы включить синхронизацию.');refreshUI(null);}}
 async function pull(){const {data,error}=await client.from('mayak_state').select('data').eq('user_id',uid).maybeSingle();if(error){status('Ошибка чтения: '+error.message,'bad');return;}if(data&&data.data&&data.data.habits)window.__mayak.applyRemote(data.data);lastSent=null;window.MayakSync.push(window.__mayak.getState());}
@@ -894,8 +914,8 @@ function wireUI(){
   $('sySave').onclick=()=>{const url=$('syUrl').value.trim().replace(/\/+$/,''),key=$('syKey').value.trim();
     if(!/^https:\/\/.+\.supabase\.co$/.test(url)){alert('Project URL должен быть вида https://xxxx.supabase.co');return;}
     if(key.length<20){alert('Похоже, anon key введён не полностью.');return;}setCfg({url,key});status('Ключи сохранены, подключаюсь…');location.reload();};
-  $('syLogin').onclick=async()=>{if(!client){alert('Сначала сохрани ключи.');return;}const email=$('syEmail').value.trim();if(!/.+@.+\..+/.test(email)){alert('Введи корректный email.');return;}
-    const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.href.split('#')[0]}});if(error)alert('Ошибка: '+error.message);else status('Письмо отправлено на '+email+'. Открой ссылку из письма на этом устройстве.','ok');};
+  $('syLogin').onclick=()=>doAuth('in');
+  $('sySignup').onclick=()=>doAuth('up');
   $('sySignout').onclick=async()=>{if(client)await client.auth.signOut();foot('');status('Вышел. Синхронизация выключена.');};
 }
 async function init(){wireUI();const cfg=getCfg();if(!cfg){status('Не настроено. Введи ключи Supabase, чтобы отметки синхронизировались между устройствами.');refreshUI(null);return;}

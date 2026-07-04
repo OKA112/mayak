@@ -1,5 +1,5 @@
 /* Маяк service worker — офлайн-кэш (stale-while-revalidate) */
-const CACHE = 'mayak-v5';
+const CACHE = 'mayak-v6';
 const ASSETS = [
   './',
   './index.html',

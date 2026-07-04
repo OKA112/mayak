@@ -35,11 +35,13 @@
    create policy "own_update" on public.mayak_state for update using (auth.uid() = user_id);
    ```
 
-3. **Authentication → URL Configuration:** в **Site URL** укажи адрес сайта,
-   а в **Redirect URLs** добавь этот же адрес (и `http://localhost` для локальных тестов).
-4. **Project Settings → API:** скопируй **Project URL** и ключ **anon public**.
-5. В приложении: **☁ синхронизация** → вставь URL и ключ → «Сохранить» → введи email → войди по ссылке из письма.
-6. Повтори вход на втором устройстве тем же email — данные объединятся.
+3. **Authentication → Sign In / Providers → Email:** выключи **Confirm email**.
+   Тогда вход идёт по email + паролю без писем — никаких лимитов на подтверждение почты.
+4. **Settings → API Keys:** скопируй **Project URL** (`https://xxxx.supabase.co`)
+   и ключ **publishable** (`sb_publishable_…`). Ключ **secret** не бери.
+5. В приложении: **☁ синхронизация** → вставь URL и ключ → «Сохранить» →
+   введи email и пароль → **«Регистрация»** (первый раз).
+6. На втором устройстве тем же email и паролем нажми **«Войти»** — данные объединятся.
 
 ## Напоминания в Telegram (по желанию)
 
