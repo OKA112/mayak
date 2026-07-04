@@ -672,7 +672,7 @@ $('saveNote').onclick=()=>{setText(TODAY,$('todayNote').value);flash($('saveNote
 
 /* ---------------- render: HABIT TABLE ---------------- */
 function renderHabitTable(){
-  const cols=[];for(let i=20;i>=0;i--)cols.push(addDays(today(),-i));
+  const cols=[];for(let i=0;i<=20;i++)cols.push(addDays(today(),-i));
   let h='<thead><tr><th class="rh">привычка</th>';
   cols.forEach(d=>{const t=key(d)===TODAY,we=d.getDay()===0||d.getDay()===6;
     h+=`<th class="${t?'now':''} ${we?'col-we':''}"><div>${DOW_S[d.getDay()]}</div><div>${d.getDate()}</div></th>`;});
